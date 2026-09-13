@@ -1,12 +1,12 @@
 # Hermes session history
 
-Hermes GPT exposes four optional, read-only MCP tools for finding and reviewing
-existing Hermes sessions. These capabilities were originally available only
-through the full ChatGPT connector. The separately installed **Hermes GPT
-Session History** integration brings the same four operations to Codex as
-native tools. They query Hermes' installed session APIs; they do not create
-sessions, resume conversations, rebuild search indexes, or write exports to
-disk.
+Hermes GPT exposes five optional, read-only MCP tools for finding and reviewing
+existing Hermes sessions, including canonical Bot Chats. These capabilities
+were originally available only through the full ChatGPT connector. The separately
+installed **Hermes GPT Session History** integration brings the same read-only
+operations to Codex as native tools. They query Hermes' installed session APIs;
+they do not create sessions, resume conversations, rebuild search indexes, or
+write exports to disk.
 
 ## Client availability
 
@@ -14,7 +14,7 @@ disk.
   server when the session-search gate is enabled.
 - **Codex:** the curated `core` and `operator` toolsets did not originally
   include session history. Install and enable the Hermes GPT Session History
-  integration to make the four exact native tool names available in Codex.
+  integration to make the session-history native tool names available in Codex.
 
 Tool availability alone does not bypass Hermes' server-side gates or privacy
 controls. After installing or updating an integration, restart or reconnect the
@@ -30,14 +30,17 @@ $env:HERMES_GPT_ENABLE_SESSION_SEARCH="1"
 python server.py
 ```
 
-The four tools are:
+The five tools are:
 
 | Tool | Purpose |
 | --- | --- |
-| `hermes_session_list` | Return bounded, safely projected session metadata. |
+| `hermes_session_list` | Return bounded, safely projected regular-session metadata. |
 | `hermes_session_search` | Search the installed read-only FTS API and return its bounded plain-text response. |
 | `hermes_session_read` | Return bounded messages from an exact or uniquely prefixed session ID. |
 | `hermes_session_export` | Return a bounded in-memory JSON or Markdown transcript. |
+| `hermes_bot_chat_get` | Resolve a profile's canonical `Bot Chat` registry row and its current compression-tip session ID. |
+
+All five tools accept an optional `profile` argument. It defaults to `default` for backward compatibility. Named profiles are resolved to that profile's `state.db` without changing process-global `HERMES_HOME`, and are permitted only when the profile exists and is included in `HERMES_GPT_OPERATOR_ALLOWED_PROFILES`. This makes routed Hermes bot profiles such as `project-manager`, `builder`, or `tech-ops` independently searchable while preserving the existing read-only `SessionDB(read_only=True)` boundary.
 
 Session control is a separate feature with a separate gate. Reading history
 does not enable `hermes_session_continue` or `hermes_session_send`.
