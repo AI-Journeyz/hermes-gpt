@@ -43,7 +43,50 @@ The five tools are:
 All five tools accept an optional `profile` argument. It defaults to `default` for backward compatibility. Named profiles are resolved to that profile's `state.db` without changing process-global `HERMES_HOME`, and are permitted only when the profile exists and is included in `HERMES_GPT_OPERATOR_ALLOWED_PROFILES`. This makes routed Hermes bot profiles such as `project-manager`, `builder`, or `tech-ops` independently searchable while preserving the existing read-only `SessionDB(read_only=True)` boundary.
 
 Session control is a separate feature with a separate gate. Reading history
-does not enable `hermes_session_continue` or `hermes_session_send`.
+does not enable `hermes_session_continue`, `hermes_session_send`, or
+`hermes_bot_chat_send`.
+
+## Sending ChatGPT output back into Hermes sessions
+
+Enable session control only on a trusted local MCP server:
+
+```powershell
+$env:HERMES_GPT_ENABLE_SESSION_CONTROL="1"
+```
+
+The session-control tools are profile-aware:
+
+| Tool | Purpose |
+| --- | --- |
+| `hermes_session_continue` | Start one bounded asynchronous turn in an existing session. |
+| `hermes_session_send` | Send terminology alias for `hermes_session_continue`. |
+| `hermes_bot_chat_send` | Resolve a profile's canonical Bot Chat/current compression tip and send one bounded turn directly to it. |
+| `hermes_session_job_status` | Poll the asynchronous send/continue job. |
+| `hermes_session_job_result` | Return the bounded, redacted result from the completed job. |
+
+`hermes_session_continue` and `hermes_session_send` accept
+`profile="default"` for backward compatibility. The server resolves the
+session ID inside that profile before dispatch and launches the Hermes
+`--resume --oneshot` subprocess with the same `HERMES_PROFILE`, preserving
+profile isolation.
+
+For routed bots, prefer `hermes_bot_chat_send`:
+
+```text
+hermes_bot_chat_send(
+  profile="project-manager",
+  prompt="<handoff or output from ChatGPT>"
+)
+```
+
+This lets ChatGPT hand work directly to Project Manager, Hermes Manager,
+Builder, Tech Ops, or another authorized profile without manually copying text
+into Hermes. The tool targets the current Bot Chat compression tip rather than
+assuming the original registry session remains current.
+
+The returned job ID can be checked with `hermes_session_job_status` and
+`hermes_session_job_result`. Only one job may run concurrently for the same
+profile+session pair.
 
 ## Privacy defaults
 

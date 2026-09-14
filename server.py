@@ -986,6 +986,49 @@ def hermes_bot_chat_get(profile: str = "default") -> str:
         adapter.dispose_safely()
 
 
+def hermes_bot_chat_send(
+    prompt: str,
+    profile: str = "default",
+    timeout: int = 900,
+) -> dict[str, Any]:
+    """Send one bounded turn directly to a profile's canonical Bot Chat."""
+    safe_profile = _validate_session_profile(profile)
+    adapter = ReadOnlySessionAdapter(profile=safe_profile)
+    try:
+        require_imports()
+        if not env_enabled(ENABLE_SESSION_SEARCH_ENV):
+            return op_policy.make_error_envelope(
+                layer="session_control",
+                code="SESSION_HISTORY_DISABLED",
+                safe_message=f"Session history is disabled. Set {ENABLE_SESSION_SEARCH_ENV}=1 to enable Bot Chat targeting.",
+                suggested_action="Enable session history on the trusted local MCP server.",
+            )
+        adapter.open()
+        resolved = adapter.get_canonical_bot_chat()
+        if resolved is None:
+            return op_policy.make_error_envelope(
+                layer="session_control",
+                code="BOT_CHAT_NOT_FOUND",
+                safe_message="No canonical Bot Chat was found for the requested profile.",
+                suggested_action="Open Bot Chat for that profile first, then retry.",
+            )
+        return hermes_session_continue(
+            resolved["current_session_id"],
+            prompt,
+            timeout,
+            safe_profile,
+        )
+    except Exception as exc:
+        return op_policy.make_error_envelope(
+            layer="session_control",
+            code="BOT_CHAT_SEND_FAILED",
+            safe_message=_redact_error(exc),
+            suggested_action="Check the Bot Chat registry, profile authorization, and Hermes CLI installation.",
+        )
+    finally:
+        adapter.dispose_safely()
+
+
 def hermes_session_list(
     limit: int = 20,
     offset: int = 0,
@@ -1245,14 +1288,25 @@ def hermes_session_search(
         adapter.dispose_safely()
 
 
-def hermes_session_continue(session_id: str, prompt: str, timeout: int = 900) -> dict[str, Any]:
-    """Start one bounded, asynchronous turn in an existing Hermes session."""
-    adapter = ReadOnlySessionAdapter()
+def hermes_session_continue(
+    session_id: str,
+    prompt: str,
+    timeout: int = 900,
+    profile: str = "default",
+) -> dict[str, Any]:
+    """Start one bounded, asynchronous turn in an existing Hermes session for a profile."""
+    safe_profile = _validate_session_profile(profile)
+    adapter = ReadOnlySessionAdapter(profile=safe_profile)
     try:
         require_imports()
         if not env_enabled(ENABLE_SESSION_CONTROL_ENV):
             return op_session.hermes_session_continue(
-                session_id, prompt, timeout, hermes_root=_default_hermes_root(), agent_root=HERMES_ROOT
+                session_id,
+                prompt,
+                timeout,
+                hermes_root=_default_hermes_root(),
+                agent_root=HERMES_ROOT,
+                profile=safe_profile,
             )
         adapter.open()
         resolved_id = adapter.resolve_session_id(session_id)
@@ -1260,8 +1314,8 @@ def hermes_session_continue(session_id: str, prompt: str, timeout: int = 900) ->
             return op_policy.make_error_envelope(
                 layer="session_control",
                 code="SESSION_ID_NOT_FOUND_OR_AMBIGUOUS",
-                safe_message="The requested session ID was not found or is ambiguous.",
-                suggested_action="Use an exact or unique-prefix ID returned by hermes_session_list.",
+                safe_message="The requested session ID was not found or is ambiguous in the requested profile.",
+                suggested_action="Use an exact or unique-prefix ID returned by hermes_session_list for that profile.",
             )
         return op_session.hermes_session_continue(
             resolved_id,
@@ -1269,21 +1323,27 @@ def hermes_session_continue(session_id: str, prompt: str, timeout: int = 900) ->
             timeout,
             hermes_root=_default_hermes_root(),
             agent_root=HERMES_ROOT,
+            profile=safe_profile,
         )
     except Exception as exc:
         return op_policy.make_error_envelope(
             layer="session_control",
             code="SESSION_CONTINUE_FAILED",
             safe_message=_redact_error(exc),
-            suggested_action="Check the Hermes session database and local CLI installation.",
+            suggested_action="Check the Hermes session database, profile, and local CLI installation.",
         )
     finally:
         adapter.dispose_safely()
 
 
-def hermes_session_send(session_id: str, prompt: str, timeout: int = 900) -> dict[str, Any]:
-    """Alias for hermes_session_continue for clients that use send terminology."""
-    return hermes_session_continue(session_id, prompt, timeout)
+def hermes_session_send(
+    session_id: str,
+    prompt: str,
+    timeout: int = 900,
+    profile: str = "default",
+) -> dict[str, Any]:
+    """Alias for profile-aware hermes_session_continue for clients that use send terminology."""
+    return hermes_session_continue(session_id, prompt, timeout, profile)
 
 
 def hermes_session_job_status(job_id: str) -> dict[str, Any]:
@@ -3147,6 +3207,8 @@ def register_tools(server: FastMCP) -> None:
     if env_enabled(ENABLE_SESSION_CONTROL_ENV):
         server.add_tool(hermes_session_continue, meta=tool_meta())
         server.add_tool(hermes_session_send, meta=tool_meta())
+        if env_enabled(ENABLE_SESSION_SEARCH_ENV):
+            server.add_tool(hermes_bot_chat_send, meta=tool_meta())
         server.add_tool(hermes_session_job_status, meta=tool_meta())
         server.add_tool(hermes_session_job_result, meta=tool_meta())
     if env_enabled(ENABLE_VISION_ENV):

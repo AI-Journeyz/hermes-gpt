@@ -63,10 +63,12 @@ def test_mocked_continue_status_and_result(monkeypatch, tmp_path):
     assert Path(calls[0].argv[0]).name.lower() in {"hermes", "hermes.exe"}
     assert calls[0].argv[1:] == ["--resume", "20260810_143227_6b0982", "--oneshot", prompt]
     assert calls[0].kwargs["shell"] is False
+    assert calls[0].kwargs["env"]["HERMES_PROFILE"] == "default"
 
     status = session.hermes_session_job_status(started["job_id"], tmp_path)
     assert status["job"]["status"] == "completed"
     assert status["job"]["timeout"] == session.MAX_TIMEOUT
+    assert status["job"]["profile"] == "default"
     metadata_text = json.dumps(status)
     assert prompt not in metadata_text
     assert status["job"]["prompt_len"] == len(prompt)
@@ -90,7 +92,7 @@ def test_job_lookup_and_input_bounds(monkeypatch, tmp_path):
 
 def test_same_session_cannot_run_concurrently(monkeypatch, tmp_path):
     monkeypatch.setenv(session.ENABLE_SESSION_CONTROL_ENV, "1")
-    monkeypatch.setitem(session._active_sessions, "session-1", "b" * 32)
+    monkeypatch.setitem(session._active_sessions, "default:session-1", "b" * 32)
     result = session.hermes_session_continue("session-1", "next", hermes_root=tmp_path)
     assert result["code"] == "SESSION_BUSY"
 

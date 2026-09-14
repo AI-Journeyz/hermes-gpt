@@ -105,6 +105,7 @@ def test_default_tool_surface_is_read_or_local_metadata_only(monkeypatch):
         "hermes_session_search",
         "hermes_session_continue",
         "hermes_session_send",
+        "hermes_bot_chat_send",
         "hermes_session_job_status",
         "hermes_session_job_result",
         "hermes_vision_analyze",
@@ -160,6 +161,7 @@ def test_env_gates_expose_high_risk_tools(monkeypatch):
     assert "hermes_session_search" in names
     assert "hermes_session_continue" in names
     assert "hermes_session_send" in names
+    assert "hermes_bot_chat_send" in names
     assert "hermes_session_job_status" in names
     assert "hermes_session_job_result" in names
     assert "hermes_vision_analyze" in names
@@ -934,6 +936,90 @@ def test_session_continue_resolves_id_before_runner_dispatch(monkeypatch, tmp_pa
     assert dispatched["prompt"] == "continue safely"
     assert dispatched["timeout"] == 123
     assert dispatched["hermes_root"] == tmp_path
+    assert dispatched["profile"] == "default"
+    with pytest.raises(sqlite3.ProgrammingError):
+        connection.execute("select 1")
+
+
+def test_session_continue_resolves_id_in_requested_profile(monkeypatch, tmp_path):
+    monkeypatch.setenv(server.ENABLE_SESSION_CONTROL_ENV, "1")
+    monkeypatch.setattr(server, "require_imports", lambda: None)
+    monkeypatch.setattr(server, "_validate_session_profile", lambda profile="default": profile)
+    connection = sqlite3.connect(":memory:")
+    fake_db = _Phase1FakeSessionDB(connection)
+    monkeypatch.setattr(server, "SessionDB", lambda **kwargs: fake_db)
+    monkeypatch.setattr(server, "_default_hermes_root", lambda: tmp_path)
+    dispatched = {}
+
+    def fake_continue(session_id, prompt, timeout, **kwargs):
+        dispatched.update(
+            session_id=session_id, prompt=prompt, timeout=timeout, **kwargs
+        )
+        return {"success": True, "job_id": "b" * 32, "status": "running"}
+
+    monkeypatch.setattr(server.op_session, "hermes_session_continue", fake_continue)
+    result = server.hermes_session_continue(
+        "prefix",
+        "send to project manager",
+        timeout=60,
+        profile="project-manager",
+    )
+
+    assert result["success"] is True
+    assert dispatched["session_id"] == "session-1"
+    assert dispatched["profile"] == "project-manager"
+    with pytest.raises(sqlite3.ProgrammingError):
+        connection.execute("select 1")
+
+
+def test_bot_chat_send_targets_current_tip_in_requested_profile(monkeypatch):
+    monkeypatch.setenv(server.ENABLE_SESSION_SEARCH_ENV, "1")
+    monkeypatch.setattr(server, "require_imports", lambda: None)
+    monkeypatch.setattr(server, "_validate_session_profile", lambda profile="default": profile)
+    connection = sqlite3.connect(":memory:")
+    fake_db = _Phase1FakeSessionDB(
+        connection,
+        session_rows=[
+            {
+                "id": "bot-registry",
+                "title": "Bot Chat",
+                "source": "desktop",
+                "archived": 0,
+            },
+            {
+                "id": "bot-current",
+                "source": "desktop",
+                "archived": 0,
+                "_compression_tip_for": "bot-registry",
+            },
+        ],
+    )
+    monkeypatch.setattr(server, "SessionDB", lambda **kwargs: fake_db)
+    dispatched = {}
+
+    def fake_continue(session_id, prompt, timeout=900, profile="default"):
+        dispatched.update(
+            session_id=session_id,
+            prompt=prompt,
+            timeout=timeout,
+            profile=profile,
+        )
+        return {"success": True, "job_id": "c" * 32, "status": "running"}
+
+    monkeypatch.setattr(server, "hermes_session_continue", fake_continue)
+    result = server.hermes_bot_chat_send(
+        "handoff from ChatGPT",
+        profile="project-manager",
+        timeout=321,
+    )
+
+    assert result["success"] is True
+    assert dispatched == {
+        "session_id": "bot-current",
+        "prompt": "handoff from ChatGPT",
+        "timeout": 321,
+        "profile": "project-manager",
+    }
     with pytest.raises(sqlite3.ProgrammingError):
         connection.execute("select 1")
 
