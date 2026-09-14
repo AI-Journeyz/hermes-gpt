@@ -160,6 +160,13 @@ def hermes_session_continue(
             )
         _active_sessions[active_key] = job_id
     child_env = os.environ.copy()
+    base_home = (
+        Path(hermes_root)
+        if hermes_root is not None
+        else Path(os.environ.get("HERMES_HOME", Path.home() / ".hermes"))
+    )
+    profile_home = op.resolve_profile_home(safe_profile, base_home)
+    child_env["HERMES_HOME"] = str(profile_home)
     child_env["HERMES_PROFILE"] = safe_profile
     try:
         proc = subprocess.Popen(

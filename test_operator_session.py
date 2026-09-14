@@ -57,18 +57,20 @@ def test_mocked_continue_status_and_result(monkeypatch, tmp_path):
         timeout=99999,
         hermes_root=tmp_path,
         agent_root=tmp_path / "agent",
+        profile="project-manager",
     )
     assert started["success"] is True
     assert len(calls) == 1
     assert Path(calls[0].argv[0]).name.lower() in {"hermes", "hermes.exe"}
     assert calls[0].argv[1:] == ["--resume", "20260810_143227_6b0982", "--oneshot", prompt]
     assert calls[0].kwargs["shell"] is False
-    assert calls[0].kwargs["env"]["HERMES_PROFILE"] == "default"
+    assert calls[0].kwargs["env"]["HERMES_PROFILE"] == "project-manager"
+    assert calls[0].kwargs["env"]["HERMES_HOME"] == str(tmp_path / "profiles" / "project-manager")
 
     status = session.hermes_session_job_status(started["job_id"], tmp_path)
     assert status["job"]["status"] == "completed"
     assert status["job"]["timeout"] == session.MAX_TIMEOUT
-    assert status["job"]["profile"] == "default"
+    assert status["job"]["profile"] == "project-manager"
     metadata_text = json.dumps(status)
     assert prompt not in metadata_text
     assert status["job"]["prompt_len"] == len(prompt)
