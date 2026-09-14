@@ -79,6 +79,8 @@ MAX_ID_LENGTH = 256
 MAX_QUERY_LENGTH = 512
 MAX_RESPONSE_BYTES = 262_144
 MAX_MESSAGE_SCAN_ROWS = 1_000
+DEFAULT_SESSION_OFFSET = 0
+DEFAULT_SESSION_TIMEOUT = 900
 
 _DEFAULT_MESSAGE_ROLES = {"user", "assistant"}
 _INTERNAL_MESSAGE_ROLES = {"system", "tool", "function"}
@@ -1031,7 +1033,7 @@ def hermes_bot_chat_send(
 
 def hermes_session_list(
     limit: int = 20,
-    offset: int = 0,
+    offset: int = DEFAULT_SESSION_OFFSET,
     include_archived: bool = False,
     profile: str = "default",
 ) -> str:
@@ -1254,7 +1256,7 @@ def hermes_session_export(
 def hermes_session_search(
     query: str,
     limit: int = 20,
-    offset: int = 0,
+    offset: int = DEFAULT_SESSION_OFFSET,
     profile: str = "default",
 ) -> str:
     safe_profile = _validate_session_profile(profile)
@@ -1291,7 +1293,7 @@ def hermes_session_search(
 def hermes_session_continue(
     session_id: str,
     prompt: str,
-    timeout: int = 900,
+    timeout: int = DEFAULT_SESSION_TIMEOUT,
     profile: str = "default",
 ) -> dict[str, Any]:
     """Start one bounded, asynchronous turn in an existing Hermes session for a profile."""
@@ -1339,7 +1341,7 @@ def hermes_session_continue(
 def hermes_session_send(
     session_id: str,
     prompt: str,
-    timeout: int = 900,
+    timeout: int = DEFAULT_SESSION_TIMEOUT,
     profile: str = "default",
 ) -> dict[str, Any]:
     """Alias for profile-aware hermes_session_continue for clients that use send terminology."""
