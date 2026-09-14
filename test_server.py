@@ -1594,14 +1594,9 @@ def test_history_enabled_connector_surface_acceptance(monkeypatch):
     monkeypatch.setenv(server.op_finance.ENABLE_FINANCE_ENV, "1")
     monkeypatch.setenv("HERMES_HOME", str(Path(server.__file__).resolve().parent))
 
-    evidence_path = (
-        Path(__file__).resolve().parent / "reports" / "GATE5-TOOL-MANIFESTS.json"
-    )
-    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-    stock_enabled = evidence["manifests"]["stock_on"]
-    stock_enabled_names = stock_enabled["names"]
-    assert stock_enabled["total"] == stock_enabled["unique"] == 141
-    assert stock_enabled["duplicates"] == []
+    disabled = server.build_server()
+    disabled_names = tool_names(disabled)
+    assert len(disabled_names) == len(set(disabled_names)) == V09_CONNECTOR_TOOL_COUNT
 
     monkeypatch.setenv(server.ENABLE_SESSION_SEARCH_ENV, "1")
     enabled = server.build_server()
@@ -1616,8 +1611,8 @@ def test_history_enabled_connector_surface_acceptance(monkeypatch):
     }
 
     assert len(enabled_names) == len(set(enabled_names)) == 142
-    assert set(enabled_names) - set(stock_enabled_names) == {"hermes_bot_chat_get"}
-    assert set(stock_enabled_names) - set(enabled_names) == set()
+    assert set(enabled_names) - set(disabled_names) == expected_history_tools
+    assert set(disabled_names) - set(enabled_names) == set()
 
     enabled_by_name = {tool.name: tool for tool in enabled_tools}
     for name in expected_history_tools:
