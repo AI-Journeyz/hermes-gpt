@@ -17,8 +17,12 @@ write exports to disk.
   integration to make the session-history native tool names available in Codex.
 
 Tool availability alone does not bypass Hermes' server-side gates or privacy
-controls. After installing or updating an integration, restart or reconnect the
-client so it refreshes the native tool manifest.
+controls. ChatGPT uses a frozen snapshot of an approved MCP app's tools and
+inputs. A backend restart does not update that snapshot. After adding a tool or
+changing its input schema, refresh the app's actions in ChatGPT workspace
+settings, review and enable the new actions, and publish the update before
+opening a new chat. Business workspaces that cannot update a published app must
+recreate and republish it. See [OpenAI's MCP app guidance](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt).
 
 ## Enable locally
 
@@ -41,6 +45,8 @@ The five tools are:
 | `hermes_bot_chat_get` | Resolve a profile's canonical `Bot Chat` registry row and its current compression-tip session ID. |
 
 All five tools accept an optional `profile` argument. It defaults to `default` for backward compatibility. Named profiles are resolved to that profile's `state.db` without changing process-global `HERMES_HOME`, and are permitted only when the profile exists and is included in `HERMES_GPT_OPERATOR_ALLOWED_PROFILES`. This makes routed Hermes bot profiles such as `project-manager`, `builder`, or `tech-ops` independently searchable while preserving the existing read-only `SessionDB(read_only=True)` boundary.
+
+Canonical Bot Chat registry rows and compression continuations may be marked hidden by Hermes and therefore omitted from `hermes_session_list`, which intentionally lists regular visible sessions. This is not a missing-session condition. Use `hermes_bot_chat_get(profile)` to resolve the authoritative registry/current IDs and `hermes_bot_chat_send(profile, prompt)` to act on the current tip. The `current_session_id` is also actionable through `hermes_session_continue` or `hermes_session_send` when the same explicit `profile` is supplied.
 
 Session control is a separate feature with a separate gate. Reading history
 does not enable `hermes_session_continue`, `hermes_session_send`, or

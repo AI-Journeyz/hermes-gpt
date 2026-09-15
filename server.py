@@ -951,7 +951,7 @@ def _session_page_response(
 
 
 def hermes_bot_chat_get(profile: str = "default") -> str:
-    """Return the canonical Bot Chat registry row and current compression tip for a profile."""
+    """Return a profile's canonical Bot Chat; it may be hidden from the general session list."""
     safe_profile = _validate_session_profile(profile)
     adapter = ReadOnlySessionAdapter(profile=safe_profile)
     try:
@@ -978,6 +978,8 @@ def hermes_bot_chat_get(profile: str = "default") -> str:
             "registry_session_id": resolved["registry_session_id"],
             "current_session_id": resolved["current_session_id"],
             "compression_continuation": resolved["registry_session_id"] != resolved["current_session_id"],
+            "session_list_visibility": "canonical_bot_chat_may_be_hidden",
+            "preferred_send_tool": "hermes_bot_chat_send",
             "registry": registry,
             "current": current,
         }

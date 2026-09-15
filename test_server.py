@@ -1109,6 +1109,8 @@ def test_phase2_bot_chat_get_resolves_hidden_registry_to_current_tip(monkeypatch
     assert result["registry_session_id"] == "bot-root"
     assert result["current_session_id"] == "bot-tip"
     assert result["compression_continuation"] is True
+    assert result["session_list_visibility"] == "canonical_bot_chat_may_be_hidden"
+    assert result["preferred_send_tool"] == "hermes_bot_chat_send"
     assert result["registry"]["id"] == "bot-root"
     assert result["current"]["id"] == "bot-tip"
     assert result["current"]["last_active"] == 9.0
